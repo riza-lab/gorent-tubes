@@ -5,57 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Mail, Check, X, LogOut } from "lucide-react"
 import Link from "next/link"
-
-const mockOrders = [
-  {
-    id: "ORD-001",
-    customerName: "John Doe",
-    customerEmail: "john@example.com",
-    car: "BMW 330i",
-    checkIn: "Dec 1, 2025",
-    checkOut: "Dec 5, 2025",
-    status: "pending-order",
-    total: "$1250.00",
-    days: 5,
-    emailSent: false,
-  },
-  {
-    id: "ORD-002",
-    customerName: "Jane Smith",
-    customerEmail: "jane@example.com",
-    car: "Mercedes C-Class",
-    checkIn: "Dec 2, 2025",
-    checkOut: "Dec 7, 2025",
-    status: "pending-payment",
-    total: "$1500.00",
-    days: 5,
-    emailSent: true,
-  },
-  {
-    id: "ORD-003",
-    customerName: "Robert Johnson",
-    customerEmail: "robert@example.com",
-    car: "Audi A6",
-    checkIn: "Nov 28, 2025",
-    checkOut: "Dec 2, 2025",
-    status: "accepted",
-    total: "$1120.00",
-    days: 4,
-    emailSent: true,
-  },
-  {
-    id: "ORD-004",
-    customerName: "Sarah Williams",
-    customerEmail: "sarah@example.com",
-    car: "Porsche 911 GTS",
-    checkIn: "Dec 10, 2025",
-    checkOut: "Dec 12, 2025",
-    status: "declined",
-    total: "$960.00",
-    days: 2,
-    emailSent: false,
-  },
-]
+import { createClient } from "@/lib/supabase-client"
 
 const statusConfig = {
   "pending-order": { label: "Pending Order", color: "bg-blue-100 text-blue-900", icon: "⏳" },
@@ -65,43 +15,71 @@ const statusConfig = {
 }
 
 export default function OrderManagementPage() {
-  const [orders, setOrders] = useState(mockOrders)
+  const [orders, setOrders] = useState<any[]>([])
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [isClient, setIsClient] = useState(false)
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
     setIsClient(true)
     const adminUser = localStorage.getItem("adminUser")
     if (!adminUser) {
       router.push("/admin/login")
+      return
     }
-  }, [router])
+
+    const fetchBookings = async () => {
+      const { data, error } = await supabase.from("bookings").select("*").order("created_at", { ascending: false })
+
+      if (!error && data) {
+        setOrders(data)
+      }
+      setLoading(false)
+    }
+
+    fetchBookings()
+  }, [router, supabase])
 
   const handleLogout = () => {
     localStorage.removeItem("adminUser")
     router.push("/admin/login")
   }
 
-  const handleAcceptOrder = (orderId: string) => {
-    setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: "pending-payment" } : order)))
-    console.log("[v0] Order accepted, moved to pending payment:", orderId)
+  const handleAcceptOrder = async (orderId: string) => {
+    const { error } = await supabase.from("bookings").update({ status: "pending-payment" }).eq("id", orderId)
+
+    if (!error) {
+      setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: "pending-payment" } : order)))
+    }
   }
 
-  const handleDeclineOrder = (orderId: string) => {
-    setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: "declined" } : order)))
-    console.log("[v0] Order declined:", orderId)
+  const handleDeclineOrder = async (orderId: string) => {
+    const { error } = await supabase.from("bookings").update({ status: "declined" }).eq("id", orderId)
+
+    if (!error) {
+      setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: "declined" } : order)))
+    }
   }
 
-  const handleSendPaymentEmail = (orderId: string) => {
-    setOrders(orders.map((order) => (order.id === orderId ? { ...order, emailSent: true } : order)))
+  const handleSendPaymentEmail = async (orderId: string) => {
     const order = orders.find((o) => o.id === orderId)
-    console.log("[v0] Payment email sent to:", order?.customerEmail)
+    console.log(`[v0] Sending payment email to ${order?.user_email}`)
+
+    const { error } = await supabase.from("bookings").update({ email_sent: true }).eq("id", orderId)
+
+    if (!error) {
+      setOrders(orders.map((o) => (o.id === orderId ? { ...o, email_sent: true } : o)))
+    }
   }
 
-  const handleProcessOrder = (orderId: string) => {
-    setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: "accepted" } : order)))
-    console.log("[v0] Order processed and accepted:", orderId)
+  const handleProcessOrder = async (orderId: string) => {
+    const { error } = await supabase.from("bookings").update({ status: "accepted" }).eq("id", orderId)
+
+    if (!error) {
+      setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: "accepted" } : order)))
+    }
   }
 
   const filteredOrders =
@@ -109,7 +87,7 @@ export default function OrderManagementPage() {
       ? orders
       : orders.filter((order) => order.status === selectedStatus.toLowerCase().replace(" ", "-"))
 
-  if (!isClient) return null
+  if (!isClient || loading) return null
 
   return (
     <div className="min-h-screen bg-background">
@@ -180,34 +158,43 @@ export default function OrderManagementPage() {
 
         <div className="space-y-4">
           {filteredOrders.map((order) => {
-            const statusConfig_info = statusConfig[order.status as keyof typeof statusConfig]
+            const config = statusConfig[order.status as keyof typeof statusConfig] || statusConfig["pending-order"]
             return (
-              <Card key={order.id} className={`rounded-xl border-2 p-6 transition ${statusConfig_info.color}`}>
+              <Card key={order.id} className={`rounded-xl border-2 p-6 transition ${config.color}`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Order Details */}
                   <div>
                     <div className="mb-4">
-                      <h3 className="text-xl font-bold">{order.id}</h3>
-                      <p className="text-sm mt-1 font-semibold">{order.car}</p>
+                      <h3 className="text-xl font-bold">{order.car_name}</h3>
+                      <p className="text-sm mt-1 font-semibold">ID: {order.id?.slice(0, 8)}</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <div className="text-muted-foreground text-xs">Customer</div>
-                        <div className="font-semibold">{order.customerName}</div>
-                        <div className="text-xs">{order.customerEmail}</div>
+                        <div className="font-semibold">{order.user_email}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground text-xs">Check-in</div>
-                        <div className="font-semibold">{order.checkIn}</div>
+                        <div className="font-semibold">
+                          {new Date(order.check_in).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground text-xs">Check-out</div>
-                        <div className="font-semibold">{order.checkOut}</div>
+                        <div className="font-semibold">
+                          {new Date(order.check_out).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground text-xs">Total</div>
-                        <div className="font-bold text-lg">{order.total}</div>
+                        <div className="font-bold text-lg">Rp {order.total_price?.toLocaleString("id-ID")}</div>
                       </div>
                     </div>
                   </div>
@@ -216,7 +203,7 @@ export default function OrderManagementPage() {
                   <div className="flex flex-col justify-between">
                     <div>
                       <span className={`inline-block px-3 py-1 rounded-full font-semibold text-sm`}>
-                        {statusConfig_info.icon} {statusConfig_info.label}
+                        {config.icon} {config.label}
                       </span>
                     </div>
 
@@ -243,13 +230,13 @@ export default function OrderManagementPage() {
                       <div className="flex flex-col gap-3">
                         <Button
                           onClick={() => handleSendPaymentEmail(order.id)}
-                          disabled={order.emailSent}
+                          disabled={order.email_sent}
                           className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                           <Mail className="w-4 h-4" />
-                          {order.emailSent ? "Email Sent" : "Send Email for Payment"}
+                          {order.email_sent ? "Email Sent" : "Send Email for Payment"}
                         </Button>
-                        {order.emailSent && (
+                        {order.email_sent && (
                           <Button
                             onClick={() => handleProcessOrder(order.id)}
                             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold flex items-center justify-center gap-2"
@@ -279,7 +266,7 @@ export default function OrderManagementPage() {
 
         {filteredOrders.length === 0 && (
           <Card className="p-8 text-center">
-            <p className="text-muted-foreground text-lg">No {selectedStatus.toLowerCase()} orders found.</p>
+            <p className="text-muted-foreground text-lg">No {selectedStatus.toLowerCase()} bookings found.</p>
           </Card>
         )}
       </div>

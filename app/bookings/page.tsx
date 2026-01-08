@@ -6,44 +6,8 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 import { Navbar } from "@/components/navbar"
 
-const initialBookings = [
-  {
-    id: 1,
-    carImage: "GO-RENT",
-    status: "Pending",
-    checkIn: "Nov 25, 2025",
-    checkOut: "Nov 30, 2025",
-    duration: "5 Days",
-    price: "$250",
-    total: "$1250.00",
-    statusColor: "bg-status-pending",
-  },
-  {
-    id: 2,
-    carImage: "GO-RENT",
-    status: "Confirmed",
-    checkIn: "Nov 25, 2025",
-    checkOut: "Nov 30, 2025",
-    duration: "5 Days",
-    price: "$250",
-    total: "$1250.00",
-    statusColor: "bg-status-confirmed",
-  },
-  {
-    id: 3,
-    carImage: "GO-RENT",
-    status: "Completed",
-    checkIn: "Nov 25, 2025",
-    checkOut: "Nov 30, 2025",
-    duration: "5 Days",
-    price: "$250",
-    total: "$1250.00",
-    statusColor: "bg-status-completed",
-  },
-]
-
 export default function BookingsPage() {
-  const [bookings, setBookings] = useState(initialBookings)
+  const [bookings, setBookings] = useState<any[]>([])
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -56,27 +20,41 @@ export default function BookingsPage() {
         data: { user: authUser },
       } = await supabase.auth.getUser()
       setUser(authUser)
+
+      if (authUser) {
+        const { data, error } = await supabase
+          .from("bookings")
+          .select("*")
+          .eq("user_email", authUser.email)
+          .order("created_at", { ascending: false })
+
+        if (!error && data) {
+          setBookings(data)
+        }
+      }
       setLoading(false)
     }
     checkAuth()
   }, [supabase])
 
-  const handleCancelBooking = (id: number) => {
-    setBookings(
-      bookings.map((booking) =>
-        booking.id === id ? { ...booking, status: "Cancelled", statusColor: "bg-status-cancelled" } : booking,
-      ),
-    )
+  const handleCancelBooking = async (bookingId: string) => {
+    const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId)
+
+    if (!error) {
+      setBookings(bookings.map((b) => (b.id === bookingId ? { ...b, status: "cancelled" } : b)))
+    }
   }
 
   const filteredBookings = bookings.filter((booking) => {
     if (selectedStatus === "All") return true
-    return booking.status === selectedStatus
+    return booking.status === selectedStatus.toLowerCase().replace(" ", "-")
   })
 
-  const activeBookings = bookings.filter((b) => ["Pending", "Confirmed"].includes(b.status)).length
-  const completedBookings = bookings.filter((b) => b.status === "Completed").length
-  const totalSpent = bookings.length * 1250
+  const activeBookings = bookings.filter((b) =>
+    ["pending-order", "pending-payment", "accepted"].includes(b.status),
+  ).length
+  const completedBookings = bookings.filter((b) => b.status === "completed").length
+  const totalSpent = bookings.reduce((sum, b) => sum + (b.total_price || 0), 0)
 
   if (loading) {
     return (
@@ -116,7 +94,6 @@ export default function BookingsPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* Page Content */}
       <div className="max-w-7xl mx-auto px-4 py-12">
         <h1 className="text-4xl font-bold mb-2">My Bookings</h1>
         <p className="text-muted-foreground mb-8">View and manage your luxury car reservations</p>
@@ -132,14 +109,14 @@ export default function BookingsPage() {
             <div className="text-3xl font-bold text-primary">{completedBookings}</div>
           </div>
           <div className="bg-primary/10 rounded-xl p-6">
-            <div className="text-sm text-muted-foreground">Total, Spent</div>
-            <div className="text-3xl font-bold text-primary">${totalSpent}.00</div>
+            <div className="text-sm text-muted-foreground">Total Spent</div>
+            <div className="text-3xl font-bold text-primary">Rp {totalSpent.toLocaleString("id-ID")}</div>
           </div>
         </div>
 
         {/* Filter Buttons */}
         <div className="flex flex-wrap gap-2 mb-8">
-          {["All", "Pending", "Confirmed", "Completed", "Cancelled"].map((status) => (
+          {["All", "Pending-Order", "Pending-Payment", "Accepted", "Completed", "Cancelled"].map((status) => (
             <button
               key={status}
               onClick={() => setSelectedStatus(status)}
@@ -159,32 +136,28 @@ export default function BookingsPage() {
           {filteredBookings.map((booking) => (
             <div
               key={booking.id}
-              className={`rounded-2xl p-6 border border-border`}
+              className="rounded-2xl p-6 border border-border"
               style={{
                 backgroundColor:
-                  booking.status === "Pending"
+                  booking.status === "pending-order"
                     ? "#FEF3C7"
-                    : booking.status === "Confirmed"
+                    : booking.status === "pending-payment"
                       ? "#CFFAFE"
-                      : booking.status === "Completed"
-                        ? "#F3F4F6"
-                        : booking.status === "Cancelled"
+                      : booking.status === "accepted"
+                        ? "#D1FAE5"
+                        : booking.status === "completed"
                           ? "#F3F4F6"
-                          : "#FCE7F3",
+                          : "#F3F4F6",
               }}
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="bg-muted rounded-lg w-20 h-20 flex items-center justify-center">
-                  <span className="text-sm">Image</span>
+                <div className="bg-muted rounded-lg w-20 h-20 flex items-center justify-center font-semibold">
+                  {booking.car_name?.split(" ")[0]}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-lg">{booking.carImage}</h3>
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                      booking.status === "Cancelled" ? "bg-white/50 text-red-600" : "bg-white/50"
-                    }`}
-                  >
-                    {booking.status}
+                  <h3 className="font-bold text-lg">{booking.car_name}</h3>
+                  <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-white/50">
+                    {booking.status?.replace("-", " ")}
                   </span>
                 </div>
               </div>
@@ -192,28 +165,39 @@ export default function BookingsPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
                 <div>
                   <div className="text-muted-foreground">Check In</div>
-                  <div className="font-semibold">{booking.checkIn}</div>
+                  <div className="font-semibold">
+                    {new Date(booking.check_in).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Check Out</div>
-                  <div className="font-semibold">{booking.checkOut}</div>
+                  <div className="font-semibold">
+                    {new Date(booking.check_out).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Duration</div>
-                  <div className="font-semibold">{booking.duration}</div>
+                  <div className="font-semibold">{booking.duration_days} Days</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Price per Day</div>
-                  <div className="font-semibold">{booking.price}</div>
+                  <div className="font-semibold">Rp {booking.price_per_day?.toLocaleString("id-ID")}</div>
                 </div>
               </div>
 
               <div className="border-t border-white/20 pt-4 mb-4">
-                <div className="text-sm text-muted-foreground mb-2">Currently in progress - Return by 11/30/2025</div>
-                <div className="font-bold text-lg">Total Price: {booking.total}</div>
+                <div className="font-bold text-lg">Total Price: Rp {booking.total_price?.toLocaleString("id-ID")}</div>
               </div>
 
-              {booking.status === "Pending" && (
+              {booking.status === "pending-order" && (
                 <Button
                   onClick={() => handleCancelBooking(booking.id)}
                   className="w-full bg-red-600 hover:bg-red-700 text-white"
@@ -224,6 +208,12 @@ export default function BookingsPage() {
             </div>
           ))}
         </div>
+
+        {filteredBookings.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground text-lg">No bookings found</p>
+          </div>
+        )}
       </div>
     </div>
   )

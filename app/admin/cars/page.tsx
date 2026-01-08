@@ -427,12 +427,14 @@ export default function ManageCarsPage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-primary text-primary-foreground border-b border-primary/20">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/admin" className="flex items-center gap-3 hover:opacity-80 transition">
-            <div className="w-10 h-10 bg-primary-foreground rounded-lg flex items-center justify-center">
-              <span className="font-bold text-primary">GO</span>
-            </div>
-            <h1 className="text-2xl font-bold">Admin GO-RENT</h1>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/admin/main" className="flex items-center gap-3 hover:opacity-80 transition">
+              <div className="w-10 h-10 bg-primary-foreground rounded-lg flex items-center justify-center">
+                <span className="font-bold text-primary">GO</span>
+              </div>
+              <h1 className="text-2xl font-bold">Admin GO-RENT</h1>
+            </Link>
+          </div>
           <Button
             onClick={handleLogout}
             variant="outline"

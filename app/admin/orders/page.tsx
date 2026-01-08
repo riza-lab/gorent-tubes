@@ -94,7 +94,7 @@ export default function OrderManagementPage() {
       <header className="sticky top-0 z-50 bg-primary text-primary-foreground border-b border-primary/20">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/admin" className="flex items-center gap-3 hover:opacity-80 transition">
+            <Link href="/admin/main" className="flex items-center gap-3 hover:opacity-80 transition">
               <div className="w-10 h-10 bg-primary-foreground rounded-lg flex items-center justify-center">
                 <span className="font-bold text-primary">GO</span>
               </div>
@@ -236,15 +236,13 @@ export default function OrderManagementPage() {
                           <Mail className="w-4 h-4" />
                           {order.email_sent ? "Email Sent" : "Send Email for Payment"}
                         </Button>
-                        {order.email_sent && (
-                          <Button
-                            onClick={() => handleProcessOrder(order.id)}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold flex items-center justify-center gap-2"
-                          >
-                            <Check className="w-4 h-4" />
-                            Process Order
-                          </Button>
-                        )}
+                        <Button
+                          onClick={() => handleProcessOrder(order.id)}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold flex items-center justify-center gap-2"
+                        >
+                          <Check className="w-4 h-4" />
+                          Accept Order
+                        </Button>
                       </div>
                     )}
 

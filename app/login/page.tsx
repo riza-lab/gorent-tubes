@@ -58,7 +58,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-primary mb-2">GO-RENT</h1>
+          <Link href="/" className="inline-block hover:opacity-80 transition">
+            <h1 className="text-4xl font-bold text-primary mb-2">GO-RENT</h1>
+          </Link>
           <p className="text-muted-foreground">Luxury Car Rental Service</p>
         </div>
 
